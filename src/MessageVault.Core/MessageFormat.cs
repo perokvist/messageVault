@@ -4,7 +4,7 @@ using System.IO;
 namespace MessageVault {
 
 	public static class MessageFormat {
-		public static void Write(BinaryWriter writer, MessageId id, MessageToWrite item)
+		public static void WriteMessage(BinaryWriter writer, MessageId id, MessageToWrite item)
 		{
 			writer.Write(ReservedFormatVersion);
 			writer.Write(id.GetBytes());
@@ -13,7 +13,7 @@ namespace MessageVault {
 			writer.Write(item.Value);
 		}
 
-		public static int EstimateSize(MessageToWrite item) {
+		public static int EstimateMessageSize(MessageToWrite item) {
 			int sizeEstimate
 				= 1 // magic byte 
 					+ 16 // ID
@@ -22,7 +22,7 @@ namespace MessageVault {
 			return sizeEstimate;
 		}
 
-		public static Message Read(BinaryReader binary) {
+		public static Message ReadMessage(BinaryReader binary) {
 			var version = binary.ReadByte();
 			if (version != ReservedFormatVersion)
 			{
@@ -39,5 +39,4 @@ namespace MessageVault {
 
 		public const byte ReservedFormatVersion = 0x01;
 	}
-
 }

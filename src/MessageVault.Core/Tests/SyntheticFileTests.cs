@@ -1,3 +1,4 @@
+#if DEBUG
 using System.IO;
 using MessageVault.Files;
 using NUnit.Framework;
@@ -37,5 +38,5 @@ namespace MessageVault.Tests {
             Directory.Delete(_folder, true);
         }
     }
-
 }
+#endif

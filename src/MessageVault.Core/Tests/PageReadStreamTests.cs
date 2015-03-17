@@ -1,3 +1,4 @@
+#if DEBUG
 using System.IO;
 using System.Text;
 using NUnit.Framework;
@@ -92,7 +93,6 @@ namespace MessageVault.Tests {
 				}
 			}
 		}
-
 	}
-
 }
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,11 +14,9 @@ namespace MessageVault.Tests {
         [Test]
         public void given_empty_when_check_position()
         {
-
             Assert.AreEqual(0, Writer.GetPosition());
             Assert.AreEqual(0, Reader.GetPosition());
         }
-
 
         [Test, ExpectedException(typeof(ArgumentException))]
         public void append_throws_on_empty_collection()
@@ -65,9 +64,7 @@ namespace MessageVault.Tests {
         public void given_two_written_messages_when_read_from_offset()
         {
 
-
         }
-
 
         [Test]
         public void quasi_random_test()
@@ -89,5 +86,5 @@ namespace MessageVault.Tests {
             }
         }
     }
-
 }
+#endif

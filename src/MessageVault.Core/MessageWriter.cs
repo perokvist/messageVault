@@ -156,7 +156,7 @@ namespace MessageVault {
 					throw new InvalidOperationException(message);
 				}
 
-				var sizeEstimate = MessageFormat.EstimateSize(item);
+				var sizeEstimate = MessageFormat.EstimateMessageSize(item);
 
 				var availableInBuffer = _stream.Length - _stream.Position;
 				if (sizeEstimate > availableInBuffer) {
@@ -165,7 +165,7 @@ namespace MessageVault {
 
 				var offset = VirtualPosition();
 				var id = MessageId.CreateNew(offset);
-				MessageFormat.Write(_binary, id, item);
+				MessageFormat.WriteMessage(_binary, id, item);
 			}
 			FlushBuffer();
 			_positionWriter.Update(_savedPosition);

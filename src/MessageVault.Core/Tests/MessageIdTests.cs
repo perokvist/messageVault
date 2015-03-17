@@ -1,7 +1,7 @@
+#if DEBUG
 using NUnit.Framework;
 
 namespace MessageVault.Tests {
-
 	[TestFixture]
 	public sealed class MessageIdTests {
 		[Test]
@@ -91,9 +91,6 @@ namespace MessageVault.Tests {
 				value = value << 1;
 			}
 		}
-
-
-
 	}
-
 }
+#endif

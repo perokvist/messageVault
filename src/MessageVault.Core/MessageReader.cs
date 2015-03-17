@@ -36,7 +36,7 @@ namespace MessageVault {
             using (var prs = new PageReadStream(_messages, from, till, _buffer)) {
                 using (var bin = new BinaryReader(prs)) {
                     while (prs.Position < prs.Length) {
-                        var message = MessageFormat.Read(bin);
+                        var message = MessageFormat.ReadMessage(bin);
                         list.Add(message);
                         position = prs.Position;
                         if (list.Count >= maxCount) {
@@ -61,7 +61,6 @@ namespace MessageVault {
             return queue;
         }
 
-
         void RunSubscription(
             ConcurrentQueue<Message> queue,
             long position,
@@ -78,7 +77,7 @@ namespace MessageVault {
                     using (var prs = new PageReadStream(_messages, position, length, buffer)) {
                         using (var bin = new BinaryReader(prs)) {
                             while (prs.Position < prs.Length) {
-                                var message = MessageFormat.Read(bin);
+                                var message = MessageFormat.ReadMessage(bin);
                                 queue.Enqueue(message);
                                 position = prs.Position;
                                 while (queue.Count >= cacheSize) {
@@ -87,10 +86,11 @@ namespace MessageVault {
                             }
                         }
                     }
-                    // wait till we get chance to advance
+                    // wait for the message stream to get new message
                     while (_position.Read() == position)
                     {
                         if (ct.WaitHandle.WaitOne(1000)) {
+							// Cancellation signaled - exit
                             return;
                         }
                     }
@@ -135,5 +135,4 @@ namespace MessageVault {
             }
         }
     }
-
 }
