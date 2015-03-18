@@ -63,37 +63,24 @@ namespace MessageVault {
 
         void RunSubscription(
             ConcurrentQueue<Message> queue,
-            long position,
+            long startPosition,
             CancellationToken ct,
             int bufferSize,
-            int cacheSize
+            int queueLimit
             ) {
+
             var buffer = new byte[bufferSize];
-            // forever try
+			var currentPosition = startPosition;
+
+            // read messages until token cancelled
             while (!ct.IsCancellationRequested) {
                 try {
-                    // read current max length
-                    var length = _position.Read();
-                    using (var prs = new PageReadStream(_messages, position, length, buffer)) {
-                        using (var bin = new BinaryReader(prs)) {
-                            while (prs.Position < prs.Length) {
-                                var message = MessageFormat.ReadMessage(bin);
-                                queue.Enqueue(message);
-                                position = prs.Position;
-                                while (queue.Count >= cacheSize) {
-                                    ct.WaitHandle.WaitOne(100);
-                                }
-                            }
-                        }
-                    }
-                    // wait for the message stream to get new message
-                    while (_position.Read() == position)
-                    {
-                        if (ct.WaitHandle.WaitOne(1000)) {
-							// Cancellation signaled - exit
-                            return;
-                        }
-                    }
+	                currentPosition = EnqueAllExistingMessages( queue, currentPosition, ct, buffer, queueLimit );
+	                if( WaitForNewMessagesInMv( currentPosition, ct ) )
+					{
+						// Cancellation signaled - exit
+		                return;
+					}
                 }
                 catch (Exception ex) {
                     Debug.Print("Exception {0}", ex);
@@ -102,7 +89,45 @@ namespace MessageVault {
             }
         }
 
-        public async Task<MessageResult> GetMessagesAsync(CancellationToken ct, long start,
+	    bool WaitForNewMessagesInMv( long startPosition, CancellationToken ct ) {
+		    // wait for the message stream to get new message
+		    while( _position.Read() == startPosition ) {
+			    if( ct.WaitHandle.WaitOne( 1000 ) ) {
+				    // Cancellation signaled - exit
+				    return true;
+			    }
+		    }
+		    return false;
+	    }
+
+	    long EnqueAllExistingMessages( ConcurrentQueue< Message > queue, long position, CancellationToken ct, byte[] buffer, int cacheSize ) {
+			// read current max length
+		    var length = _position.Read();
+		    using( var prs = new PageReadStream( _messages, position, length, buffer ) ) {
+			    using( var bin = new BinaryReader( prs ) ) {
+				    while( prs.Position < prs.Length ) {
+					    position = EnqueMessage( queue, bin, prs );
+
+					    WaitForMessagesToDequeue( queue, ct, cacheSize );
+				    }
+			    }
+		    }
+		    return position;
+	    }
+
+	    static long EnqueMessage( ConcurrentQueue< Message > queue, BinaryReader bin, PageReadStream prs ) {
+		    var message = MessageFormat.ReadMessage( bin );
+		    queue.Enqueue( message );
+		    return prs.Position;
+	    }
+
+	    static void WaitForMessagesToDequeue( ConcurrentQueue< Message > queue, CancellationToken ct, int queueLimit ) {
+		    while( queue.Count >= queueLimit ) {
+			    ct.WaitHandle.WaitOne( 100 );
+		    }
+	    }
+
+	    public async Task<MessageResult> GetMessagesAsync(CancellationToken ct, long start,
             int limit) {
             while (!ct.IsCancellationRequested) {
                 var actual = _position.Read();
