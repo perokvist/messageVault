@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MessageVault.Server.Auth;
 using MessageVault.Server.Election;
+using Microsoft.Owin;
 using Microsoft.Owin.Hosting;
 using Nancy;
 using Nancy.Authentication.Basic;
@@ -15,14 +16,17 @@ using Nancy.TinyIoc;
 using Owin;
 using Serilog;
 
-namespace MessageVault.Server {
+namespace MessageVault.Server
+{
 
-	public sealed class App {
+	public sealed class App
+	{
 		readonly IDisposable _api;
 		readonly ILogger _log = Log.ForContext<App>();
 		readonly CancellationTokenSource _source = new CancellationTokenSource();
 
-		App(IDisposable api, CancellationTokenSource source, IList<Task> tasks) {
+		App(IDisposable api, CancellationTokenSource source, IList<Task> tasks)
+		{
 			_api = api;
 			_source = source;
 			_tasks = tasks;
@@ -30,9 +34,17 @@ namespace MessageVault.Server {
 
 		readonly IList<Task> _tasks;
 
-		public static App Initialize(AppConfig config) {
+
+
+		public static App Initialize(AppConfig config)
+		{
+			return Initialize(config, (options, nancyoptions) => WebApp.Start(options, builder => builder.UseNancy()));
+		}
+
+		public static App Initialize(AppConfig config, Func<StartOptions, NancyOptions, IDisposable> hostFunc)
+		{
 			config.ThrowIfInvalid();
-			var poller =  new LeaderInfoPoller(config.StorageAccount);
+			var poller = new LeaderInfoPoller(config.StorageAccount);
 			var startOptions = new StartOptions();
 			startOptions.Urls.Add(config.InternalUri);
 			startOptions.Urls.Add(config.PublicUri);
@@ -45,32 +57,34 @@ namespace MessageVault.Server {
 				Bootstrapper = new NancyBootstrapper(api, new UserValidator(auth))
 			};
 			var nodeInfo = new LeaderInfo(config.InternalUri);
-			
+
 			var selector = new LeaderLock(config.StorageAccount, nodeInfo, api);
-			
+
 			var cts = new CancellationTokenSource();
 			// fire up leader and scheduler first
 			var tasks = new List<Task> {
-				selector.KeepTryingToAcquireLock(cts.Token), 
+				selector.KeepTryingToAcquireLock(cts.Token),
 				poller.KeepPollingForLeaderInfo(cts.Token),
 			};
-
-			
 			// bind the API
-			var webApp = WebApp.Start(startOptions, x => x.UseNancy(nancyOptions));
-			return new App(webApp, cts, tasks);
+			var host = hostFunc(startOptions, nancyOptions);
+
+			return new App(host, cts, tasks);
 		}
 
-		static void AddSystemAccess(AuthData auth, string accountStorageKey) {
-			
-			auth.Users.Add(Constants.ClusterNodeUser, new UserInfo {
+		static void AddSystemAccess(AuthData auth, string accountStorageKey)
+		{
+
+			auth.Users.Add(Constants.ClusterNodeUser, new UserInfo
+			{
 				Password = accountStorageKey,
-				Claims = new [] {"all:write"}
+				Claims = new[] { "all:write" }
 			});
 		}
 
 
-		public void RequestStop() {
+		public void RequestStop()
+		{
 			// signal stopping for all
 			_source.Cancel();
 			// kill api and stop accepting new requests
@@ -78,9 +92,11 @@ namespace MessageVault.Server {
 
 		}
 
-		public async Task GetCompletionTask() {
+		public async Task GetCompletionTask()
+		{
 			var allTasks = Task.WhenAll(_tasks);
-			try {
+			try
+			{
 				await allTasks;
 			}
 			catch (Exception)
@@ -106,18 +122,23 @@ namespace MessageVault.Server {
 
 			public IEnumerable<string> Claims { get; set; }
 		}
-		sealed class UserValidator : IUserValidator {
+		sealed class UserValidator : IUserValidator
+		{
 			readonly AuthData _auth;
 
-			public UserValidator(AuthData auth) {
+			public UserValidator(AuthData auth)
+			{
 				_auth = auth;
 			}
 
-			public IUserIdentity Validate(string username, string password) {
+			public IUserIdentity Validate(string username, string password)
+			{
 				// TODO: add bcrypt handling
 				UserInfo value;
-				if (_auth.Users.TryGetValue(username, out value) && string.Equals(value.Password, password)) {
-					return new UserIdentity() {
+				if (_auth.Users.TryGetValue(username, out value) && string.Equals(value.Password, password))
+				{
+					return new UserIdentity()
+					{
 						UserName = username,
 						Claims = value.Claims,
 					};
@@ -129,16 +150,19 @@ namespace MessageVault.Server {
 		/// <summary>
 		///   Passes our dependencies to Nancy modules
 		/// </summary>
-		sealed class NancyBootstrapper : DefaultNancyBootstrapper {
+		sealed class NancyBootstrapper : DefaultNancyBootstrapper
+		{
 			readonly ApiImplementation _scheduler;
 			readonly IUserValidator _validator;
 
-			public NancyBootstrapper(ApiImplementation scheduler, IUserValidator validator ) {
+			public NancyBootstrapper(ApiImplementation scheduler, IUserValidator validator)
+			{
 				_scheduler = scheduler;
 				_validator = validator;
 			}
 
-			protected override void ConfigureApplicationContainer(TinyIoCContainer container) {
+			protected override void ConfigureApplicationContainer(TinyIoCContainer container)
+			{
 				base.ConfigureApplicationContainer(container);
 				container.Register(_scheduler);
 				container.Register(_validator);
@@ -148,7 +172,7 @@ namespace MessageVault.Server {
 				base.ApplicationStartup(container, pipelines);
 
 				var configuration = new BasicAuthenticationConfiguration(
-					container.Resolve<IUserValidator>(), 
+					container.Resolve<IUserValidator>(),
 						"MessageVault"
 						);
 				pipelines.EnableBasicAuthentication(configuration);
